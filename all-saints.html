@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>All Saints Cathedral | 7am Choir Nairobi — Interactive Media Hub</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4a2c8f;
+      --primary-dark: #3a226e;
+      --accent: #d4af37;
+      --bg-light: #f8f9fa;
+      --card-light: white;
+      --text-light: #333;
+      --border-light: #ddd;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      line-height: 1.6;
+      color: var(--text-light);
+      background: var(--bg-light);
+      margin: 0;
+      transition: background 0.3s, color 0.2s;
+    }
+
+    body.dark {
+      --bg-light: #121212;
+      --card-light: #1e1e2a;
+      --text-light: #eee;
+      --border-light: #444;
+      background: #121212;
+      color: #eee;
+    }
+
+    body.dark header { background: linear-gradient(135deg, #2c1a5c, #4a2c8f); }
+    body.dark .section-card { background: #1e1e2a; color: #eee; }
+    body.dark .media-item { background: #2a2a2a; }
+    body.dark .filter-btn { background: #333; color: white; border-color: #555; }
+    body.dark .search-bar { background: #2a2a2a; color: white; border-color: #555; }
+    body.dark .modal-content { background: #1e1e2a; color: #eee; }
+
+    header {
+      background: linear-gradient(135deg, #4a2c8f, #6b46c0);
+      color: white;
+      text-align: center;
+      padding: 2.5rem 1rem;
+    }
+
+    header h1 { font-size: 2.2rem; margin: 0; }
+    header p { font-size: 1.1rem; opacity: 0.9; margin-top: 0.5rem; }
+
+    nav {
+      background: #222;
+      padding: 1rem 0;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    nav a, .admin-btn, .toggle-btn {
+      color: white;
+      text-decoration: none;
+      margin: 0 8px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 40px;
+      transition: 0.2s;
+      cursor: pointer;
+    }
+
+    nav a:hover, .admin-btn:hover, .toggle-btn:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .admin-btn, .toggle-btn {
+      background: var(--accent);
+      border: none;
+      color: #222;
+      font-weight: bold;
+    }
+
+    .admin-btn:hover, .toggle-btn:hover {
+      background: #e0b830;
+      transform: scale(0.97);
+    }
+
+    .hero {
+      background: linear-gradient(rgba(0,0,0,0.65), rgba(0,0,0,0.65)), url('https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=1600') center/cover no-repeat;
+      min-height: 55vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      color: white;
+      padding: 2rem;
+    }
+
+    .hero h2 { font-size: 2.8rem; margin-bottom: 0.5rem; text-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .hero p { font-size: 1.3rem; max-width: 700px; }
+
+    .section {
+      padding: 60px 24px;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    .section-card {
+      background: white;
+      border-radius: 20px;
+      padding: 1.8rem;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      transition: transform 0.2s;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: var(--primary);
+      font-size: 2rem;
+    }
+    body.dark h2 { color: #c4b5ff; }
+
+    /* schedule */
+    .schedule-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      justify-content: center;
+    }
+    .schedule-card {
+      background: #f5f0fe;
+      border-radius: 1.5rem;
+      padding: 1.2rem 1.5rem;
+      flex: 1;
+      min-width: 200px;
+      text-align: center;
+    }
+    body.dark .schedule-card { background: #2a2a3a; }
+
+    /* filters + search */
+    .filters {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+    .filter-btn {
+      padding: 10px 24px;
+      margin: 5px;
+      border: none;
+      border-radius: 40px;
+      background: #e9e9ef;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.2s;
+    }
+    .filter-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+    .search-bar {
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto 30px auto;
+      padding: 12px 20px;
+      border: 1px solid var(--border-light);
+      border-radius: 60px;
+      font-size: 1rem;
+      display: block;
+      background: var(--card-light);
+      color: var(--text-light);
+    }
+
+    /* media grid */
+    .media-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .media-item {
+      background: var(--card-light);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.08);
+      text-align: center;
+      transition: 0.2s;
+    }
+    .media-item:hover { transform: translateY(-5px); }
+    .media-item video { width: 100%; border-radius: 12px; background: #000; max-height: 180px; object-fit: cover; }
+    .media-item i { font-size: 3.5rem; color: #c52828; margin: 15px 0; }
+    .media-item a { text-decoration: none; color: inherit; }
+    .category-badge {
+      display: inline-block;
+      background: #e9deff;
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.7rem;
+      margin-top: 6px;
+    }
+    body.dark .category-badge { background: #3c2a6e; color: #ddd; }
+
+    /* modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 28px;
+      border-radius: 28px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    body.dark .modal-content { background: #1e1e2a; }
+    .close-modal {
+      float: right;
+      font-size: 1.8rem;
+      cursor: pointer;
+    }
+    input, select, .admin-file {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 60px;
+      border: 1px solid var(--border-light);
+      background: var(--card-light);
+      color: var(--text-light);
+    }
+    .admin-btn-primary {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 60px;
+      padding: 12px;
+      width: 100%;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .admin-list-item {
+      background: #f3effc;
+      border-radius: 16px;
+      padding: 12px;
+      margin: 10px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    body.dark .admin-list-item { background: #2a2a3a; }
+    .delete-media-btn {
+      background: #e11d48;
+      border: none;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 30px;
+      cursor: pointer;
+    }
+
+    footer {
+      background: #0e0b1c;
+      color: #bfb9dc;
+      text-align: center;
+      padding: 2rem;
+      margin-top: 2rem;
+    }
+
+    @media (max-width: 700px) {
+      .hero h2 { font-size: 2rem; }
+      .section { padding: 40px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⛪ All Saints Cathedral</h1>
+  <p><strong>7am Choir • Nairobi</strong> — worship in spirit & truth</p>
+</header>
+
+<nav>
+  <a href="#home">Home</a>
+  <a href="#schedule">Schedule</a>
+  <a href="#media">Media</a>
+  <a href="#about">About</a>
+  <button class="admin-btn" onclick="showAdminModal()"><i class="fas fa-lock"></i> Admin</button>
+  <button class="toggle-btn" onclick="toggleDarkMode()"><i class="fas fa-moon"></i> Dark Mode</button>
+</nav>
+
+<section id="home" class="hero">
+  <h2>Singing Unto The Lord</h2>
+  <p>"Make a joyful noise unto the Lord, all the earth." — Psalm 100:1</p>
+  <p style="margin-top: 1rem; font-style: italic;">Join us every Sunday at 7am</p>
+</section>
+
+<!-- Schedule Section -->
+<section id="schedule" class="section">
+  <h2><i class="fas fa-calendar-alt"></i> Choir Schedule</h2>
+  <div class="schedule-grid">
+    <div class="schedule-card"><i class="fas fa-church"></i><br><strong>Sundays</strong><br>7:00 AM Worship Service</div>
+    <div class="schedule-card"><i class="fas fa-microphone-alt"></i><br><strong>Rehearsals</strong><br>Saturday 4:00 PM – 6:00 PM</div>
+    <div class="schedule-card"><i class="fas fa-music"></i><br><strong>Special Programs</strong><br>Easter, Christmas, Harvest</div>
+    <div class="schedule-card"><i class="fas fa-star-of-life"></i><br><strong>Next Event</strong><br><span id="nextEvent">Pentecost Praise Night - June 8, 2026</span></div>
+  </div>
+</section>
+
+<!-- Media Library -->
+<section id="media" class="section">
+  <h2><i class="fas fa-photo-video"></i> Media Library</h2>
+  <input type="text" id="searchInput" class="search-bar" placeholder="🔍 Search by title..." onkeyup="filterAndRender()">
+  
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All</button>
+    <button class="filter-btn" data-filter="video" onclick="setFilter('video')">Videos</button>
+    <button class="filter-btn" data-filter="song" onclick="setFilter('song')">Songs (PDF)</button>
+    <button class="filter-btn" data-filter="bulletin" onclick="setFilter('bulletin')">Bulletins (PDF)</button>
+  </div>
+
+  <div id="mediaContainer" class="media-grid">
+    <!-- dynamic content -->
+    <div style="grid-column:1/-1; text-align:center; padding:40px;"><i class="fas fa-spinner fa-pulse"></i> Loading media...</div>
+  </div>
+</section>
+
+<!-- About -->
+<section id="about" class="section">
+  <div style="background:#f0e6ff; border-radius:2rem; padding:2rem; text-align:center;">
+    <h2>About 7am Choir</h2>
+    <p style="max-width:800px; margin:0 auto; font-size:1.1rem;">
+      We are the 7am Choir of All Saints Cathedral, Nairobi. Our mission is to lead the congregation in vibrant, spirit-filled worship every Sunday morning.
+    </p>
+    <p style="margin-top:1rem;"><i class="fas fa-map-marker-alt"></i> All Saints Cathedral, Kenyatta Ave, Nairobi</p>
+    <p><i class="fas fa-envelope"></i> 7amchoir@allsaintsnairobi.org</p>
+  </div>
+</section>
+
+<footer>
+  <p>© 2026 All Saints Cathedral — 7am Choir. Grace & peace.</p>
+</footer>
+
+<!-- Admin Modal -->
+<div id="adminModal" class="modal">
+  <div class="modal-content">
+    <span class="close-modal" onclick="closeAdminModal()">&times;</span>
+    <h2><i class="fas fa-shield-alt"></i> Admin Stewardship</h2>
+    <div id="adminLoginArea">
+      <p>🔐 Enter admin password</p>
+      <input type="password" id="adminPassword" placeholder="Password">
+      <button id="loginBtn" class="admin-btn-primary">Login</button>
+    </div>
+    <div id="adminDashboard" style="display:none;">
+      <div style="display:flex; justify-content:space-between;">
+        <h3>Upload Media</h3>
+        <button id="logoutAdminBtn" style="background:#ccc; border:none; border-radius:30px; padding:5px 12px;">Logout</button>
+      </div>
+      <input type="text" id="mediaTitle" placeholder="Title">
+      <select id="mediaCategory">
+        <option value="video">Video (MP4)</option>
+        <option value="song">Song (PDF)</option>
+        <option value="bulletin">Bulletin (PDF)</option>
+      </select>
+      <input type="file" id="mediaFile" accept="video/mp4,application/pdf">
+      <small>ⓘ Max: 25MB for video, 8MB for PDF</small>
+      <button id="uploadMediaBtn" class="admin-btn-primary" style="margin-top:12px;"><i class="fas fa-cloud-upload-alt"></i> Upload</button>
+      <hr>
+      <h4>Manage Uploaded Files</h4>
+      <div id="adminMediaList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- STORAGE (localStorage) ----------
+  let mediaLibrary = [];      // each: { id, name, url, type, category, date }
+  let currentFilter = "all";
+  let currentSearch = "";
+
+  // Helper: generate unique ID
+  function generateId() { return Date.now() + Math.random() * 10000; }
+
+  // Load from localStorage
+  function loadMedia() {
+    const stored = localStorage.getItem('choir_media_v3');
+    if (stored) {
+      try {
+        mediaLibrary = JSON.parse(stored);
+        if (!Array.isArray(mediaLibrary)) mediaLibrary = [];
+      } catch(e) { mediaLibrary = []; }
+    }
+    // if empty, seed with sample
+    if (mediaLibrary.length === 0) {
+      seedSampleMedia();
+    }
+    renderPublicMedia();
+  }
+
+  function saveMedia() {
+    localStorage.setItem('choir_media_v3', JSON.stringify(mediaLibrary));
+  }
+
+  // seed sample PDFs and a video placeholder note
+  async function seedSampleMedia() {
+    const samplePdfBlob = new Blob(["%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 65>>stream BT/F1 24 Tf 100 700 Td (Glory to God!) Tj ET BT/F1 12 Tf 100 650 Td (Welcome to 7am Choir. Upload your own PDFs.) Tj ET endstream endobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref\n0 6\ntrailer<</Size 6/Root 1 0 R>>\n%%EOF"], {type: "application/pdf"});
+    const sampleSong = { id: generateId(), name: "Great Is Thy Faithfulness (Hymn)", url: URL.createObjectURL(samplePdfBlob), type: "pdf", category: "song", date: new Date().toISOString() };
+    const sampleBulletin = { id: generateId(), name: "Easter Sunday Bulletin 2026", url: URL.createObjectURL(samplePdfBlob), type: "pdf", category: "bulletin", date: new Date().toISOString() };
+    mediaLibrary.push(sampleSong, sampleBulletin);
+    saveMedia();
+    // revoke object URLs after saving to avoid memory leaks but keep for rendering
+  }
+
+  // Render public media with filter & search
+  function filterAndRender() {
+    const searchInput = document.getElementById('searchInput');
+    currentSearch = searchInput ? searchInput.value.toLowerCase() : "";
+    renderPublicMedia();
+  }
+
+  function renderPublicMedia() {
+    const container = document.getElementById('mediaContainer');
+    if (!container) return;
+
+    let filtered = mediaLibrary.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(currentSearch);
+      const matchesFilter = (currentFilter === 'all') || (item.category === currentFilter);
+      return matchesSearch && matchesFilter;
+    });
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:50px; background:#f9f2e6; border-radius:2rem;">
+        <i class="fas fa-folder-open"></i> No media found. Try different search or filter.</div>`;
+      return;
+    }
+
+    let html = '';
+    for (let item of filtered) {
+      const safeName = escapeHtml(item.name);
+      const dateStr = new Date(item.date).toLocaleDateString();
+      let categoryLabel = item.category === 'video' ? 'Video' : (item.category === 'song' ? 'Song Sheet' : 'Bulletin');
+      if (item.type === 'video') {
+        html += `
+          <div class="media-item">
+            <video controls preload="metadata">
+              <source src="${item.url}" type="video/mp4">
+            </video>
+            <p><strong>${safeName}</strong></p>
+            <div><span class="category-badge"><i class="fas fa-video"></i> ${categoryLabel}</span> <span style="font-size:0.7rem;">📅 ${dateStr}</span></div>
+          </div>`;
+      } else {
+        html += `
+          <div class="media-item">
+            <a href="${item.url}" target="_blank" rel="noopener">
+              <i class="fas fa-file-pdf"></i>
+              <p><strong>${safeName}</strong></p>
+              <div><span class="category-badge"><i class="fas fa-file-alt"></i> ${categoryLabel}</span> <span style="font-size:0.7rem;">📅 ${dateStr}</span></div>
+            </a>
+          </div>`;
+      }
+    }
+    container.innerHTML = html;
+  }
+
+  function escapeHtml(str) { return str.replace(/[&<>]/g, m => m==='&'?'&amp;':m==='<'?'&lt;':'&gt;'); }
+
+  function setFilter(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      if (btn.dataset.filter === filter) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    filterAndRender();
+  }
+
+  // Admin UI
+  let adminLoggedIn = false;
+
+  function showAdminModal() {
+    const modal = document.getElementById('adminModal');
+    const loginArea = document.getElementById('adminLoginArea');
+    const dashboard = document.getElementById('adminDashboard');
+    if (adminLoggedIn) {
+      loginArea.style.display = 'none';
+      dashboard.style.display = 'block';
+      renderAdminMediaList();
+    } else {
+      loginArea.style.display = 'block';
+      dashboard.style.display = 'none';
+      document.getElementById('adminPassword').value = '';
+    }
+    modal.style.display = 'flex';
+  }
+
+  function closeAdminModal() {
+    document.getElementById('adminModal').style.display = 'none';
+  }
+
+  function loginAdmin() {
+    const pwd = document.getElementById('adminPassword').value;
+    if (pwd === "admin123") {
+      adminLoggedIn = true;
+      sessionStorage.setItem('choir_admin_auth', 'true');
+      document.getElementById('adminLoginArea').style.display = 'none';
+      document.getElementById('adminDashboard').style.display = 'block';
+      renderAdminMediaList();
+    } else {
+      alert("❌ Incorrect password. Access denied.");
+    }
+  }
+
+  function logoutAdmin() {
+    adminLoggedIn = false;
+    sessionStorage.removeItem('choir_admin_auth');
+    document.getElementById('adminLoginArea').style.display = 'block';
+    document.getElementById('adminDashboard').style.display = 'none';
+    closeAdminModal();
+  }
+
+  function renderAdminMediaList() {
+    const listDiv = document.getElementById('adminMediaList');
+    if (!listDiv) return;
+    if (mediaLibrary.length === 0) {
+      listDiv.innerHTML = '<div style="padding:1rem; background:#f4f0fc; border-radius:1rem;">No files uploaded.</div>';
+      return;
+    }
+    let html = '';
+    mediaLibrary.forEach((item, idx) => {
+      html += `
+        <div class="admin-list-item">
+          <div><strong>${escapeHtml(item.name)}</strong><br><small>${item.category} • ${new Date(item.date).toLocaleString()}</small></div>
+          <button class="delete-media-btn" data-idx="${idx}">🗑 Delete</button>
+        </div>`;
+    });
+    listDiv.innerHTML = html;
+    document.querySelectorAll('.delete-media-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const index = parseInt(btn.dataset.idx);
+        if (confirm("Permanently delete this media?")) {
+          mediaLibrary.splice(index, 1);
+          saveMedia();
+          renderPublicMedia();
+          renderAdminMediaList();
+        }
+      });
+    });
+  }
+
+  // Upload handler with size limits
+  async function uploadMediaFile() {
+    if (!adminLoggedIn) { alert("Please login as admin first."); return; }
+    const fileInput = document.getElementById('mediaFile');
+    const titleInput = document.getElementById('mediaTitle');
+    const categorySelect = document.getElementById('mediaCategory');
+    const file = fileInput.files[0];
+    if (!file) { alert("Select a file to upload."); return; }
+
+    const isVideo = file.type === 'video/mp4';
+    const isPdf = file.type === 'application/pdf';
+    if (!isVideo && !isPdf) { alert("Only MP4 video or PDF files allowed."); return; }
+
+    const maxVideoMB = 25;
+    const maxPdfMB = 8;
+    const fileSizeMB = file.size / (1024*1024);
+    if (isVideo && fileSizeMB > maxVideoMB) { alert(`Video exceeds ${maxVideoMB}MB (${fileSizeMB.toFixed(1)}MB).`); return; }
+    if (isPdf && fileSizeMB > maxPdfMB) { alert(`PDF exceeds ${maxPdfMB}MB (${fileSizeMB.toFixed(1)}MB).`); return; }
+
+    const finalName = titleInput.value.trim() || file.name.replace(/\.[^/.]+$/, "");
+    const category = categorySelect.value; // 'video', 'song', 'bulletin'
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataURL = e.target.result;
+      const newItem = {
+        id: generateId(),
+        name: finalName,
+        url: dataURL,
+        type: isVideo ? 'video' : 'pdf',
+        category: category,
+        date: new Date().toISOString()
+      };
+      mediaLibrary.push(newItem);
+      saveMedia();
+      renderPublicMedia();
+      renderAdminMediaList();
+      alert(`✅ "${finalName}" uploaded successfully!`);
+      // reset form
+      fileInput.value = '';
+      titleInput.value = '';
+    };
+    reader.onerror = () => alert("File read error.");
+    reader.readAsDataURL(file);
+  }
+
+  // Dark mode toggle
+  function toggleDarkMode() {
+    document.body.classList.toggle('dark');
+    localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+  }
+
+  // Initialize
+  window.addEventListener('load', () => {
+    loadMedia();
+
+    // restore dark mode
+    if (localStorage.getItem('darkMode') === 'true') {
+      document.body.classList.add('dark');
+    }
+
+    // restore admin session
+    if (sessionStorage.getItem('choir_admin_auth') === 'true') {
+      adminLoggedIn = true;
+    }
+
+    // set up event listeners
+    document.getElementById('loginBtn').onclick = loginAdmin;
+    document.getElementById('logoutAdminBtn').onclick = logoutAdmin;
+    document.getElementById('uploadMediaBtn').onclick = uploadMediaFile;
+    document.getElementById('closeModalBtn')?.removeEventListener(); // not needed, but close button in modal
+    const closeSpan = document.querySelector('.close-modal');
+    if (closeSpan) closeSpan.onclick = closeAdminModal;
+    window.onclick = (e) => { if (e.target === document.getElementById('adminModal')) closeAdminModal(); };
+
+    // schedule update (dynamic next event)
+    const eventSpan = document.getElementById('nextEvent');
+    if (eventSpan) {
+      const today = new Date();
+      const nextEventDate = new Date(2026, 5, 8); // June 8, 2026
+      if (today > nextEventDate) eventSpan.innerText = "Harvest Thanksgiving - Oct 2026";
+      else eventSpan.innerText = "Pentecost Praise Night - June 8, 2026";
+    }
+  });
+</script>
+</body>
+</html>
